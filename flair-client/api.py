@@ -47,44 +47,14 @@ class Client:
         # Dict with key that contain dict of all entity types as values
         entity_dict = {}
         # The url to use
-        url = await self.create_url("/api/{entity}")
+        # url = await self.create_url("/api/{entity}")
+        url = await self.create_url("/api/" + entity_name)
 
         async with ClientSession() as session:
             async with session.get(url, headers=headers) as resp:
                 # Nested dictionary magic
                 entity_dict[entity_name] = await resp.json()
-                print(str(entity_dict))
-        # Broken i think
-        # """IDs of entities, to use with control()"""
-        # temp1 = await self.oauth_token(credentials)
-        # params = dict(Authorization="Bearer " + str(temp1))
-        # entity_dict = dict()
-
-        # async def get_entity(entity: str):
-        #     """Make code more readable, and shorten length of code"""
-
-        #     if entity_name == entity:
-        #         async with ClientSession as session:
-        #             async with session.get(
-        #                 await self.create_url("/api/{entity}"), params=params
-        #             ) as resp:
-        #                 # Some nested dictionary magic
-        #                 entity_dict[entity] = resp.json()
-        #                 return entity_dict
-
-        #                 # self.entity_dict[str(entity)] = await resp.json()
-        #                 # return await resp.status
-
-        #     else:
-        #         return "Error: Please use a proper entity name"
-
-        # # try:
-        # # Now to just await the results...
-        # await get_entity(entity=entity_name)
-
-        # # except Exception:
-        # #     print("Oops! something happened")
-        # #     print("Error Code: TODO: make an error system to aid with troubleshooting")
+                print(entity_dict)
 
     # Control entities visible to the API (E.g.: close & open vents)
     async def control(self, entity, action):
