@@ -4,3 +4,6 @@ It was written to be used with home-assistant but can have other uses.
 
 ## Usage
 TBD
+
+## Credits
+Much of the code was inspired from the original synchronous wrapper.
