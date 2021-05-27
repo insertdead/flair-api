@@ -106,16 +106,16 @@ class Get:
         async with ClientSession() as session:
             async with session.get(url, headers=headers) as resp:
                 # Dict with key that contain dict of all entity types as values
-                Get._entity_dict = {}
+                Get.entity_dict = {}
 
                 # Nested dictionary magic
-                Get._entity_dict[entity_name] = await resp.json()
+                Get.entity_dict[entity_name] = await resp.json()
 
     async def check_auto_mode(self):
         """check_auto_mode."""
         await self.get("structures")
         return (
-            True if self._entity_dict["structures"]["data"]["mode"] == "auto" else False
+            True if self.entity_dict["structures"]["data"]["mode"] == "auto" else False
         )
 
 
@@ -135,17 +135,25 @@ class Control:
         self.client_secret = client_secret
         self.api_link_dict = None
 
-    async def control_entity(self, entity_type: str, id, body, headers=DEFAULT_HEADERS):
+    async def control_entity(
+        self, entity_type: str, id, body, headers=DEFAULT_HEADERS, **kwargs
+    ):
         u = Utilities()
         path = await u.entity_url(entity_type, entity_id=id)
         url = await u.create_url(path)
+        await u.get_api_root_response()
         async with ClientSession() as session:
             async with session.patch(url, headers=headers, data=body) as resp:
-                Get._entity_dict[entity_type] = await resp.json()
+                Get.entity_dict[entity_type] = await resp.json()
 
-    async def vent_control(
-        self, percent_open: int, reason="Flair-client Python client", **kwargs: str
-    ):
+    async def control(self, entity_type: str, body, **kwargs: str):
+        u = Utilities()
+        g = Get(self.client_id, self.client_secret)
+        name = kwargs.get("name")
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + await g.oauth_token(),
+        }
         """Control vents. It is highly recommended to fill out the reason variable
         :param percent_open:
         :type percent_open: int
@@ -153,50 +161,44 @@ class Control:
         :param kwargs:
         :type kwargs: str
         """
-        u = Utilities()
-        g = Get(self.client_id, self.client_secret)
-        await u.get_api_root_response()
-        name = kwargs.get("name")
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer " + await g.oauth_token(),
-        }
-        body = json.dumps(
-            {
-                "data": {
-                    "type": "vents",
-                    "attributes": {
-                        "percent_open": percent_open,
-                        "percent_open_reason": reason,
-                    },
-                    "relationships": {},
-                }
-            }
-        )
+        # TODO: some funky dict stuff to allow use for all entity types
+        # IDEA: maybe create some kind of way to sort through lists and put them
+        # in a dict to name then to use later
+        entity_body = Get.entity_dict[entity_type]
 
+        entity_body = {
+            "data": {
+                body,
+            }
+        }
         # If id is supplied, use that instead of name
         if "id" in kwargs:
-            await self.control_entity("vents", kwargs.get("id"), body, headers)
+            await self.control_entity(
+                entity_type,
+                kwargs.get("id"),
+                json.dumps(entity_body),
+                headers,
+            )
 
         else:
             # Get id from supplied name; If user error occurs, raise ValueError
-            await u.entity_url("vents")
-            vent_dict = Get._entity_dict["vents"]["data"]
+            await u.entity_url(entity_type)
+            entity_dict = Get.entity_dict[entity_type]["data"]
             # Not sure how this works as I 'borrowed' it from SO
-            vent_num = next(
+            entity_num = next(
                 (
                     i
-                    for i, item in enumerate(vent_dict)
+                    for i, item in enumerate(entity_dict)
                     if item["attributes"]["name"] == name
                 ),
                 None,
             )
 
-            if vent_num == None:
+            if entity_num == None:
                 raise ValueError("Name of vent does not match with any in the API!")
 
-            id = vent_dict[vent_num]["data"]["id"]
-            await self.control_entity("vents", id, body, headers)
+            id = entity_dict[entity_num]["data"]["id"]
+            await self.control_entity(entity_type, id, body, headers)
 
 
 class Client:
