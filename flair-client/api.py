@@ -1,7 +1,6 @@
 """Interface with the Flair API"""
 from urllib.parse import urljoin
 import json
-
 from aiohttp import ClientSession
 
 DEFAULT_API_ROOT = "https://api.flair.co"
@@ -85,11 +84,11 @@ class Get:
 
                 return _json_body["access_token"]
 
-    async def get(self, entity_name: str):
+    async def get(self, entity_type: str):
         """get.
 
-        :param entity_name:
-        :type entity_name: str
+        :param entity_type:
+        :type entity_type: str
         """
         u = Utilities()
 
@@ -101,7 +100,7 @@ class Get:
         #
         # The url to use
         # url = await self.create_url("/api/{entity}")
-        url = await u.create_url(await u.entity_url(entity_name))
+        url = await u.create_url(await u.entity_url(entity_type))
 
         async with ClientSession() as session:
             async with session.get(url, headers=headers) as resp:
@@ -109,7 +108,7 @@ class Get:
                 Get.entity_dict = {}
 
                 # Nested dictionary magic
-                Get.entity_dict[entity_name] = await resp.json()
+                Get.entity_dict[entity_type] = await resp.json()
 
     async def check_auto_mode(self):
         """check_auto_mode."""
@@ -135,9 +134,21 @@ class Control:
         self.client_secret = client_secret
         self.api_link_dict = None
 
-    async def control_entity(
-        self, entity_type: str, id, body, headers=DEFAULT_HEADERS, **kwargs
-    ):
+    # FIX: Not exactly sure what the issue is for this one, but I most likely have to use generators
+    # async def sort_dicts(self, entity_type: str):
+    #     g = Get(self.client_id, self.client_secret)
+    #     await g.get(entity_type)
+    #
+    #     entity_dict = Get.entity_dict[entity_type]["data"]
+    #     self.sorted_dict = {}
+    #     for i in range(len(entity_dict)):
+    #         name = entity_dict[i]["attributes"]["name"]
+    #
+    #         self.sorted_dict[entity_type][name] = entity_dict[i]
+    #
+    #     return self.sorted_dict
+
+    async def control_entity(self, entity_type: str, id, body, headers=DEFAULT_HEADERS):
         u = Utilities()
         path = await u.entity_url(entity_type, entity_id=id)
         url = await u.create_url(path)
@@ -164,11 +175,11 @@ class Control:
         # TODO: some funky dict stuff to allow use for all entity types
         # IDEA: maybe create some kind of way to sort through lists and put them
         # in a dict to name then to use later
-        entity_body = Get.entity_dict[entity_type]
+        # entity_body = Get.entity_dict[entity_type]
 
-        entity_body = {
-            "data": {
-                body,
+        entity_body = { "data": {
+                "type": entity_type,
+                "attributes": body,
             }
         }
         # If id is supplied, use that instead of name
@@ -197,44 +208,12 @@ class Control:
             if entity_num == None:
                 raise ValueError("Name of vent does not match with any in the API!")
 
-            id = entity_dict[entity_num]["data"]["id"]
-            await self.control_entity(entity_type, id, body, headers)
-
-
-class Client:
-    """Interact with Flair API"""
-
-    def __init__(self, client_id=None, client_secret=None, api_root=DEFAULT_API_ROOT):
-        """__init__.
-
-        :param client_id:
-        :param client_secret:
-        :param api_root:
-        """
-
-        self.api_root = api_root
-        self.client_id = client_id
-        self.client_secret = client_secret
-        self.api_link_dict = None
-
-    # Control entities visible to the API (E.g.: close & open vents)
-    async def control(self, credentials, entity, action):
-        """control.
-
-        :param credentials:
-        :param entity:
-        :param action:
-        """
-        u = Utilities()
-        g = Get()
-
-        DEFAULT_HEADERS["Authorization"] = "Bearer " + await g.oauth_token()
-        headers = DEFAULT_HEADERS
-        await g.get("structures")
-
-        auto_mode = await g.check_auto_mode()
-
-        # If auto mode is detected, disable some functions/issue a warning as
-        # they will not be useful.
-        if auto_mode == 1:
-            pass
+            # print(entity_dict[entity_num])
+            id = entity_dict[entity_num]["id"]
+            # print(id)
+            await self.control_entity(
+                entity_type,
+                id,
+                json.dumps(entity_body),
+                headers,
+            )
