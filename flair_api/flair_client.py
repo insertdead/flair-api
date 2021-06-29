@@ -1,7 +1,9 @@
 """Interface with the Flair API"""
-from urllib.parse import urljoin
 import json
+from urllib.parse import urljoin
+
 from aiohttp import ClientSession
+from datetime import datetime
 
 DEFAULT_API_ROOT = "https://api.flair.co"
 DEFAULT_HEADERS = {
@@ -35,6 +37,7 @@ class Utilities:
                 await self.create_url("/api/"), headers=DEFAULT_HEADERS
             ) as resp:
                 self.api_link_dict = (await resp.json())["links"]
+                return self.api_link_dict
 
     async def entity_url(self, entity_type: str, **kwargs: str):
         """entity_url.
@@ -177,7 +180,8 @@ class Control:
         # in a dict to name then to use later
         # entity_body = Get.entity_dict[entity_type]
 
-        entity_body = { "data": {
+        entity_body = {
+            "data": {
                 "type": entity_type,
                 "attributes": body,
             }
@@ -217,3 +221,29 @@ class Control:
                 json.dumps(entity_body),
                 headers,
             )
+
+
+class Client:
+    """Wrapper for all the previous classes"""
+
+    def __init__(self, client_id: str, client_secret: str):
+        self.client_id = client_id
+        self.client_secret = client_secret
+
+    async def get_entities(self, file="entities.json"):
+        g = Get(self.client_id, self.client_secret)
+        u = Utilities()
+        api_link_dict = await u.get_api_root_response()
+        entity_dict = {"creation_time": datetime.now(), "data": {}}
+
+        for index, key in enumerate(api_link_dict):
+            await g.get(key)
+            entity_dict["data"][key] = Get.entity_dict
+
+        output = open(file, "w")
+        json.dump(entity_dict, output, indent=2)
+        output.close()
+
+
+def make_client():
+    pass
