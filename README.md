@@ -3,7 +3,11 @@ flair-client is an asynchronous wrapper to the [@flair-systems](https://github.c
 It was written to be used with home-assistant but can have other uses.
 
 ## Usage
-TBD
+```py
+import flair_client
+
+flair_client.make_client()
+```
 
 ## TODO
 * Error handling

@@ -1,9 +1,11 @@
 """Interface with the Flair API"""
+import asyncio
 import json
 from urllib.parse import urljoin
 
-from aiohttp import ClientSession
+from aiohttp import ClientSession, ClientResponse
 from datetime import datetime
+
 
 DEFAULT_API_ROOT = "https://api.flair.co"
 DEFAULT_HEADERS = {
@@ -12,26 +14,39 @@ DEFAULT_HEADERS = {
 }
 
 
+class Logging:
+    """Enable logging and debugging levels"""
+
+    def __init__(self, level):
+        self.level = level
+
+    def message(self, contents, urgency: int):
+        if urgency == 0:
+            print(f"LOG: {contents}")
+        elif urgency == 1:
+            print(f"WARN: {contents}")
+        elif urgency == 2:
+            print(f"ERROR: {contents}")
+        else:
+            print("Error printing message! Skipping")
+
+
 class Utilities:
-    """Utilities."""
+    """Utilities to avoid excessive boilerplate."""
 
-    def __init__(self, api_root=DEFAULT_API_ROOT):
-        """__init__.
-
-        :param api_root:
-        """
-        self.api_root = api_root
+    def __init__(self):
+        pass
 
     # Create a url from the api root and added path
-    async def create_url(self, path: str):
+    async def create_url(self, path: str, api_root: str = DEFAULT_API_ROOT):
         """create_url.
 
         :param path:
         """
-        return urljoin(self.api_root, path)
+        return urljoin(api_root, path)
 
     async def get_api_root_response(self):
-        """get_api_root_response."""
+        """Get API root response"""
         async with ClientSession() as session:
             async with session.get(
                 await self.create_url("/api/"), headers=DEFAULT_HEADERS
@@ -40,7 +55,7 @@ class Utilities:
                 return self.api_link_dict
 
     async def entity_url(self, entity_type: str, **kwargs: str):
-        """entity_url.
+        """Create an entity URL
 
         :param entity_type:
         :param kwargs:
@@ -55,40 +70,30 @@ class Utilities:
 
 
 class Get:
-    """Get."""
+    """Receive information from API"""
 
-    def __init__(self, client_id=None, client_secret=None, api_root=DEFAULT_API_ROOT):
-        """__init__.
-
-        :param client_id:
-        :param client_secret:
-        :param api_root:
-        """
-
+    def __init__(self, token: str = "", api_root=DEFAULT_API_ROOT):
+        """Initialize"""
+        self.token = token
         self.api_root = api_root
-        self.client_id = client_id
-        self.client_secret = client_secret
+
         self.api_link_dict = None
 
     # Retrieve OAuth token from API
-    async def oauth_token(self):
+    async def oauth_token(self, client_id, client_secret) -> ClientResponse:
         """Get OAuth token"""
         u = Utilities()
         params = {
-            "client_id": self.client_id,
-            "client_secret": self.client_secret,
+            "client_id": client_id,
+            "client_secret": client_secret,
             "grant_type": "client_credentials",
         }
-        async with ClientSession() as session:
-            async with session.post(
-                await u.create_url("/oauth/token"), params=params
-            ) as resp:
-                _json_body = await resp.json()
-
-                return _json_body["access_token"]
+        return await ClientSession().post(
+            await u.create_url("/oauth/token"), params=params
+        )
 
     async def get(self, entity_type: str):
-        """get.
+        """Retrieve information of a specific entity type from API
 
         :param entity_type:
         :type entity_type: str
@@ -99,7 +104,7 @@ class Get:
         # await u.get_api_root_response()
 
         # Parameters to pass to aiohttp (the OAuth token we got with the oauth_token function)
-        headers = {"Authorization": "Bearer " + str(await self.oauth_token())}
+        headers = {"Authorization": "Bearer " + self.token}
         #
         # The url to use
         # url = await self.create_url("/api/{entity}")
@@ -113,28 +118,16 @@ class Get:
                 # Nested dictionary magic
                 Get.entity_dict[entity_type] = await resp.json()
 
-    async def check_auto_mode(self):
-        """check_auto_mode."""
-        await self.get("structures")
-        return (
-            True if self.entity_dict["structures"]["data"]["mode"] == "auto" else False
-        )
-
 
 class Control:
-    """Control entities."""
+    """Control entities"""
 
-    def __init__(self, client_id=None, client_secret=None, api_root=DEFAULT_API_ROOT):
-        """__init__.
+    def __init__(self, token: str = "", api_root=DEFAULT_API_ROOT):
+        """Initialize"""
 
-        :param client_id:
-        :param client_secret:
-        :param api_root:
-        """
-
+        self.token = token
         self.api_root = api_root
-        self.client_id = client_id
-        self.client_secret = client_secret
+
         self.api_link_dict = None
 
     # FIX: Not exactly sure what the issue is for this one, but I most likely have to use generators
@@ -152,6 +145,7 @@ class Control:
     #     return self.sorted_dict
 
     async def control_entity(self, entity_type: str, id, body, headers=DEFAULT_HEADERS):
+        """Control entities by sending a PATCH request to the API"""
         u = Utilities()
         path = await u.entity_url(entity_type, entity_id=id)
         url = await u.create_url(path)
@@ -162,19 +156,13 @@ class Control:
 
     async def control(self, entity_type: str, body, **kwargs: str):
         u = Utilities()
-        g = Get(self.client_id, self.client_secret)
+        # g = Get(self.token, self.api_root)
         name = kwargs.get("name")
         headers = {
             "Content-Type": "application/json",
-            "Authorization": "Bearer " + await g.oauth_token(),
+            "Authorization": "Bearer " + self.token,
         }
-        """Control vents. It is highly recommended to fill out the reason variable
-        :param percent_open:
-        :type percent_open: int
-        :param reason:
-        :param kwargs:
-        :type kwargs: str
-        """
+        """Control entities in the API"""
         # TODO: some funky dict stuff to allow use for all entity types
         # IDEA: maybe create some kind of way to sort through lists and put them
         # in a dict to name then to use later
@@ -226,13 +214,14 @@ class Control:
 class Client:
     """Wrapper for all the previous classes"""
 
-    def __init__(self, client_id: str, client_secret: str):
-        self.client_id = client_id
-        self.client_secret = client_secret
+    def __init__(self, token: str):
+        self.token = token
 
     async def get_entities(self, file="entities.json"):
-        g = Get(self.client_id, self.client_secret)
+        """Save the entity dict into a JSON file"""
+        g = Get(self.token)
         u = Utilities()
+
         api_link_dict = await u.get_api_root_response()
         entity_dict = {"creation_time": datetime.now(), "data": {}}
 
@@ -240,10 +229,40 @@ class Client:
             await g.get(key)
             entity_dict["data"][key] = Get.entity_dict
 
+        # Check if a file of the same name already exists
+        try:
+            open(file, "x")
+        # Add a complain function/class to allow outputting warnings and errors to a log of some sort
+        except:
+            print("Warn: File already exists! Overwriting")
+
         output = open(file, "w")
         json.dump(entity_dict, output, indent=2)
         output.close()
 
+    async def read_entities(self, file="entities.json") -> dict:
+        """Import an entity class from a JSON file to avoid having to fetch from the API on every startup"""
+        try:
+            input = open(file, "r")
+            entity_dict = json.load(input)
+            input.close()
+        except:
+            # complain goes here as well
+            print("Error: File does not exist! Skipping")
+            entity_dict = {}
 
-def make_client():
-    pass
+        return entity_dict
+
+    # Wrapper methods here
+    async def Control(self, entity_type, body, id):
+        c = Control(self.token)
+
+        await c.control_entity(entity_type, id, body)
+
+
+# Might be useless - check later
+# async def make_client(client_id: str, client_secret: str, api_root=DEFAULT_API_ROOT):
+#     """Initialize variables for classes"""
+#     resp = await Get().oauth_token(client_id, client_secret)
+#     json = await resp.json()
+#     token = json["access_token"]

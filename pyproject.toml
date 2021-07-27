@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "flair-api"
+name = "flair_api"
 version = "0.1.0"
 description = ""
 authors = ["insertdead <mdsc0111@tuta.io>"]

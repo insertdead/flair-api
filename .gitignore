@@ -1,4 +1,2 @@
-tags
-__pycache__
-test.py
-*.json
+/dist/*
+__pycache__/*
