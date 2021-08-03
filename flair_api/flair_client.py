@@ -1,11 +1,10 @@
 """Interface with the Flair API"""
 import asyncio
 import json
+from datetime import datetime
 from urllib.parse import urljoin
 
-from aiohttp import ClientSession, ClientResponse
-from datetime import datetime
-
+from aiohttp import ClientResponse, ClientSession
 
 DEFAULT_API_ROOT = "https://api.flair.co"
 DEFAULT_HEADERS = {
