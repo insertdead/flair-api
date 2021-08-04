@@ -13,22 +13,6 @@ DEFAULT_HEADERS = {
 }
 
 
-class Logging:
-    """Enable logging and debugging levels"""
-
-    def __init__(self, level):
-        self.level = level
-
-    def message(self, contents, urgency: int):
-        if urgency == 0:
-            print(f"LOG: {contents}")
-        elif urgency == 1:
-            print(f"WARN: {contents}")
-        elif urgency == 2:
-            print(f"ERROR: {contents}")
-        else:
-            print("Error printing message! Skipping")
-
 
 class Utilities:
     """Utilities to avoid excessive boilerplate."""
@@ -257,11 +241,3 @@ class Client:
         c = Control(self.token)
 
         await c.control_entity(entity_type, id, body)
-
-
-# Might be useless - check later
-# async def make_client(client_id: str, client_secret: str, api_root=DEFAULT_API_ROOT):
-#     """Initialize variables for classes"""
-#     resp = await Get().oauth_token(client_id, client_secret)
-#     json = await resp.json()
-#     token = json["access_token"]
